@@ -59,7 +59,11 @@ function Data = addKinematicsTofData(oneCombo, ik_results_file, Data)
         Data.Kinematics.JointAngle = nan(J,T);
     end
     % Joint angle dims is one less. Copy last value to bottom 
-    Data.Kinematics.JointAngle(:,mask) = [ikData(:,2:end); ikData(end,2:end)]';
+    if (sum(size(ikData(:,2:end)') ~= size(Data.Kinematics.JointAngle(:,mask))) ~= 0)
+        Data.Kinematics.JointAngle(:,mask) = [ikData(:,2:end); ikData(end,2:end)]'; %ikData(1:end, 2:end)';%[ikData(:,2:end); ikData(end,2:end)]';
+    else
+        Data.Kinematics.JointAngle(:,mask) = ikData(:,2:end)';
+    end
     Data.Kinematics.JointNames = ikLabels(2:end);
 
 function writeTrc(oneCombo, Data, filepath)
