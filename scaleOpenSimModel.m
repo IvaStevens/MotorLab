@@ -34,6 +34,7 @@ function scaleOpenSimModel(monkey_session)
         if ~exist(scalePath, 'dir')
             mkdir(scalePath)
         end
+        % IRS TODO: change 'R:' to rgm/data dir ???
         rawDataPath = fullfile('R:', 'data', 'Vicon', 'Raw',...
             [subject, sprintf('%05s', session)]);
         filename = [subject,...

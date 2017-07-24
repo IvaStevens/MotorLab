@@ -115,8 +115,10 @@ function ProcessRawData(config_file, project)
 
                     Data = Intermediate2Formatted(Data);
                     %%
-                    Data = Postprocess_Joint_Kinematics(Data);
-                    % Data = Postprocess_Kinematics_Data(Data);
+                    splitBase = regexp(basedir,'[\/\\]*','split');
+                    Data.Source = splitBase{end};
+                    % Data = Postprocess_Joint_Kinematics(Data);
+                    Data = Postprocess_Kinematics_Data(Data);
                     Data = Postprocess_EMG_Data(Data);
                     Data = Postprocess_TaskStateMasks(Data);
                     Data = Postprocess_Force_Data(Data);
