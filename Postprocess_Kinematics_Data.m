@@ -1,4 +1,4 @@
-function fData = Postprocess_Joint_Kinematics(fData)
+function fData = Postprocess_Kinematics_Data(fData)
 % fData = Postprocess_Kinematics_Data( fData)
 %
 % Performs any processing of the kinematic data that requires 
@@ -20,7 +20,13 @@ function fData = Postprocess_Joint_Kinematics(fData)
 if ~isfield(fData, 'Kinematics')
     return;
 end
+if ~ismember('HNDL', fData.Kinematics.MarkerNames)
+    return;
+end
 sk_disp('Postprocess_Kinematics_Data')
+
+% markers = getMarkersInPCSpace(fData);
+% fData.Kinematics.MarkerPos = markers;
 
 subject = 'Ivan';
 session = fData.SessionNo;
@@ -28,6 +34,11 @@ OpenSimPath = fullfile(fileparts(pwd), 'data', 'OpenSim');
 sessionPath = fullfile(subject, [subject, sprintf('.%05i', session)]);
 sessionFile = [subject, sprintf('.%05i', session)];
 filepath = {OpenSimPath, sessionPath, sessionFile};
+
+T = size(fData.Time, 2);
+% J = 40;
+J = 141;
+fData.Kinematics.JointAngle = nan(J, T);
 
 allCombos = unique(fData.ComboNo);
 allCombos(allCombos == 0) = [];
@@ -41,9 +52,6 @@ for c = 1:C
     fData = addKinematicsTofData(oneCombo, ik_results_file, fData);
 end
 
-function [] = sk_disp(arg)
-    fprintf('%s\n', arg)
-
 function Data = addKinematicsTofData(oneCombo, ik_results_file, Data)
     markerPos = Data.Kinematics.MarkerPos;
     comboNo = Data.ComboNo;
@@ -53,13 +61,7 @@ function Data = addKinematicsTofData(oneCombo, ik_results_file, Data)
     mask = ~nanMask & comboMask;
     
     [ikData, ikLabels] = readStorageFile(ik_results_file);
-    if ~isfield(Data.Kinematics, 'JointAngle')
-        T = size(Data.Time, 2);
-        J = size(ikData, 2) - 1;
-        Data.Kinematics.JointAngle = nan(J,T);
-    end
-    % Joint angle dims is one less. Copy last value to bottom 
-    Data.Kinematics.JointAngle(:,mask) = [ikData(:,2:end); ikData(end,2:end)]';
+    Data.Kinematics.JointAngle(:,mask) = ikData(:,2:end)';
     Data.Kinematics.JointNames = ikLabels(2:end);
 
 function writeTrc(oneCombo, Data, filepath)
@@ -67,19 +69,6 @@ function writeTrc(oneCombo, Data, filepath)
 	OpenSimPath = filepath{1};
     sessionPath = filepath{2};
     sessionFile = filepath{3};
-    ikPath = fullfile(OpenSimPath, sessionPath,...
-                        'InverseKinematics');
-    filename = [sessionFile,... 
-                sprintf('%02i', oneCombo),...
-                '.trc'];
-    
-    if ~exist(ikPath, 'dir')
-        mkdir(ikPath)
-    end
-    
-    if exist(fullfile(ikPath, filename), 'file')
-        return
-    end
     
     markerPos = Data.Kinematics.MarkerPos;
 	markerNames = Data.Kinematics.MarkerNames;
@@ -91,10 +80,12 @@ function writeTrc(oneCombo, Data, filepath)
 	nanMask = isnan(sum(markerPos, 1));
 	mask = ~nanMask & comboMask;
 	
-    % Assumes formatted reference frame
     rotMat = [ 0, 1, 0;...
                0, 0, 1;...
                1, 0, 0];
+%     rotMat = [ 0, 0, 1;... 
+%                0,-1, 0;... 
+%                1, 0, 0];
            
 	allPos = nan(size(markerPos))';
     for idx = 1:3:3*M
@@ -115,9 +106,18 @@ function writeTrc(oneCombo, Data, filepath)
 	
 	data = [frameNumbers', time', pos];
     
+    ikPath = fullfile(OpenSimPath, sessionPath,...
+                        'InverseKinematics');
+    if ~exist(ikPath, 'dir')
+        mkdir(ikPath)
+    end
+    filename = [sessionFile,... 
+                sprintf('%02i', oneCombo),...
+                '.trc'];
+	
     fid = fopen(fullfile(ikPath, filename), 'w');
     if fid == -1
-        error(['unable to open ', fullfile(ikPath, filename)])
+        error(['unable to open ', [ikPath, filename]])
     end
 
     fprintf(fid, '%s\t%d\t%s\t%s\n', 'PathFileType', 4, '(X/Y/Z)', filename);
@@ -170,9 +170,6 @@ function motionFile = writeInverseKinematics(oneCombo, filepath)
 	motionFile = fullfile(OpenSimPath, sessionPath, ...
         'InverseKinematics', [sessionFile, ... 
         sprintf('%02i_IK.mot', oneCombo)]);
-    if exist(motionFile, 'file')
-        return
-    end
 	
 	fid = fopen(markerFile, 'r');
     if fid == -1
@@ -282,3 +279,52 @@ function [data, columnLabels] = readStorageFile(fname)
     % end
     
     fclose( fid);
+
+function P = getMarkersInPCSpace(fData)
+    % Intertrial mask
+    itMask = fData.TaskStateMasks.InterTrial;
+    hndlPos = getMarkerPos('HNDL', fData);
+    itPos = hndlPos(:,itMask);
+    % Reference-frame zero is the handle during the intertrial state
+    refPos = nanmean(itPos,2);
+    relativeHndl = bsxfun(@minus, hndlPos, refPos);
+
+    % Find the dimensions of maximum variance and project onto them
+    nanMask = isnan(sum(relativeHndl,1));
+    railPC = princomp(relativeHndl(:,~nanMask)');
+    % Check the positive direction for each dimension
+    if railPC(1,1) > 0
+        railPC(:,1) = -railPC(:,1);
+    end
+    if railPC(2,2) > 0
+        railPC(:,2) = -railPC(:,2);
+    end
+    if railPC(3,3) < 0 
+        railPC(:,3) = -railPC(:,3);
+    end
+
+    % Project all the markers onto the new dimensions and zero them
+    markerNames = fData.Kinematics.MarkerNames;
+    M = length(markerNames);
+    P = nan(3*M,size(itMask,2));
+    for m = 1:M
+        oneMarker = markerNames{m};
+        markerPos = getMarkerPos(oneMarker, fData);
+        relativeMarker = bsxfun(@minus, markerPos, refPos);
+        railProj = railPC'*relativeMarker;
+        markerIdx = getMarkerIdx(oneMarker, fData);
+        P(markerIdx,:) = railProj;
+    end
+
+function markerIdx = getMarkerIdx(markerToFind, Data)
+    markerNames = Data.Kinematics.MarkerNames;
+
+    [~, nameIdx] = ismember(markerToFind, markerNames);
+    start = 3*(nameIdx-1)+1;
+    markerIdx = start:start+2;
+
+function markerPos = getMarkerPos(markerName, Data)
+    Pos = Data.Kinematics.MarkerPos;
+
+    markerIdx = getMarkerIdx(markerName, Data);
+    markerPos = Pos(markerIdx,:);
