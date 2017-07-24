@@ -23,7 +23,7 @@ end
 if ~ismember('HNDL', fData.Kinematics.MarkerNames)
     return;
 end
-%sk_disp('Postprocess_Kinematics_Data')
+sk_disp('Postprocess_Kinematics_Data')
 
 % markers = getMarkersInPCSpace(fData);
 % fData.Kinematics.MarkerPos = markers;
@@ -52,9 +52,6 @@ for c = 1:C
     fData = addKinematicsTofData(oneCombo, ik_results_file, fData);
 end
 
-function [] = sk_disp(arg)
-    fprintf('%s\n', arg)
-
 function Data = addKinematicsTofData(oneCombo, ik_results_file, Data)
     markerPos = Data.Kinematics.MarkerPos;
     comboNo = Data.ComboNo;
@@ -64,7 +61,7 @@ function Data = addKinematicsTofData(oneCombo, ik_results_file, Data)
     mask = ~nanMask & comboMask;
     
     [ikData, ikLabels] = readStorageFile(ik_results_file);
-    Data.Kinematics.JointAngle(:,mask) = [ikData(:,2:end); ikData(end,2:end)]';
+    Data.Kinematics.JointAngle(:,mask) = ikData(:,2:end)';
     Data.Kinematics.JointNames = ikLabels(2:end);
 
 function writeTrc(oneCombo, Data, filepath)

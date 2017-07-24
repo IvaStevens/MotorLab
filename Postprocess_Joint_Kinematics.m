@@ -38,11 +38,8 @@ for c = 1:C
     % Perform inverse kinematics
     writeTrc(oneCombo, fData, filepath);
     ik_results_file = writeInverseKinematics(oneCombo, filepath);
-    fData = addKinematicsTofData(oneCombo, ik_results_file, fData);
+%     fData = addKinematicsTofData(oneCombo, ik_results_file, fData);
 end
-
-function [] = sk_disp(arg)
-    fprintf('%s\n', arg)
 
 function Data = addKinematicsTofData(oneCombo, ik_results_file, Data)
     markerPos = Data.Kinematics.MarkerPos;
@@ -114,7 +111,7 @@ function writeTrc(oneCombo, Data, filepath)
 	origStartFrame = 1;
 	origNumFrames = numFrames;
 	
-	time = 0:dt:(numFrames-1)*dt;
+	time = dt*(0:numFrames-1);
 	frameNumbers = 1:numFrames;
 	
 	data = [frameNumbers', time', pos];
@@ -124,9 +121,9 @@ function writeTrc(oneCombo, Data, filepath)
         error(['unable to open ', fullfile(ikPath, filename)])
     end
 
-    fprintf(fid, '%s\t%d\t%s\t%s\n', 'PathFileType', 4, '(X/Y/Z)', filename);
-    fprintf(fid, 'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames\n');
-    fprintf(fid, '%d\t%d\t%d\t%d\tmm\t%d\t%d\t%d\n', dataRate,...
+    fprintf(fid, '%s\t%d\t%s\t%s\r\n', 'PathFileType', 4, '(X/Y/Z)', filename);
+    fprintf(fid, 'DataRate\tCameraRate\tNumFrames\tNumMarkers\tUnits\tOrigDataRate\tOrigDataStartFrame\tOrigNumFrames\r\n');
+    fprintf(fid, '%d\t%d\t%d\t%d\tmm\t%d\t%d\t%d\r\n', dataRate,...
                                                      cameraRate,...
                                                      numFrames,...
                                                      numMarkers,...
@@ -138,7 +135,7 @@ function writeTrc(oneCombo, Data, filepath)
         oneName = markerNames{m};
         fprintf(fid, '%s\t\t\t', oneName);
     end
-    fprintf(fid, '\n');
+    fprintf(fid, '\r\n');
     fprintf(fid, '\t\t');
     for m = 1:numMarkers
         X = ['X', num2str(m)];
@@ -146,15 +143,15 @@ function writeTrc(oneCombo, Data, filepath)
         Z = ['Z', num2str(m)];
         fprintf(fid, '%s\t%s\t%s\t', X, Y, Z);
     end
-    fprintf(fid, '\n');
-    fprintf(fid, '\n');
+    fprintf(fid, '\r\n');
+    fprintf(fid, '\r\n');
 
     for r = 1:size(data, 1)
         fprintf(fid, '%i\t', data(r,1));
         for c = 2:size(data, 2)
             fprintf(fid, '%f\t', data(r,c));
         end
-        fprintf(fid, '\n');
+        fprintf(fid, '\r\n');
     end
     
     fclose(fid);
